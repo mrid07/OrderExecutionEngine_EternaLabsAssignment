@@ -82,110 +82,129 @@ Throughout the process, order updates are streamed to clients in real time via W
 
 ## 🏗️ Architecture Overview
 
-```mermaid
-flowchart LR
-    A[Client / Frontend] -->|Submit Order| B[Fastify API]
-    B -->|Enqueue Order| C[Redis Queue (BullMQ)]
-    C -->|Process Job| D[Worker]
-    D -->|Select Best DEX| E[Mock DEXs: Raydium / Meteora]
-    D -->|Update| F[(PostgreSQL DB)]
-    D -->|Broadcast Status| G[WebSocket Server]
-    G -->|Real-Time Updates| A
+**flowchart LR**  
+A[Client / Frontend] -->|Submit Order| B[Fastify API]  
+B -->|Enqueue Order| C[Redis Queue (BullMQ)]  
+C -->|Process Job| D[Worker]  
+D -->|Select Best DEX| E[Mock DEXs: Raydium / Meteora]  
+D -->|Update| F[(PostgreSQL DB)]  
+D -->|Broadcast Status| G[WebSocket Server]  
+G -->|Real-Time Updates| A  
 
-##🧩 Components
-Component	Responsibility
-API Layer	Receives order requests and enqueues them
-Queue (BullMQ)	Holds pending orders for workers
-Worker	Executes routing and simulates swap
-WebSocket Server	Sends live status updates to clients
-PostgreSQL	Stores orders and status history
+---
 
-##🧪 Data Model
-```orders Table
-Stores primary order information.
+## 🧩 Components
 
-Column	Type	Description
-id	UUID	Unique identifier
-status	TEXT	Current order status
-token_in	TEXT	Input token (e.g., SOL)
-token_out	TEXT	Output token (e.g., USDC)
-amount	NUMERIC	Swap amount
-slippage_bps	INTEGER	Max slippage tolerance
-failure_reason	TEXT	Reason for failure
-created_at	TIMESTAMP	Creation time
-updated_at	TIMESTAMP	Last update time
+**Component** | **Responsibility**  
+API Layer | Receives order requests and enqueues them  
+Queue (BullMQ) | Holds pending orders for workers  
+Worker | Executes routing and simulates swap  
+WebSocket Server | Sends live status updates to clients  
+PostgreSQL | Stores orders and status history  
 
-order_status_history Table
-Stores logs for every order state change.
+---
 
-Column	Type	Description
-id	SERIAL	Log ID
-order_id	UUID	Reference to order
-status	TEXT	Status at this log
-payload	JSONB	Metadata for event
-created_at	TIMESTAMP	When logged```
+## 🧪 Data Model
 
-## Local Setup
-```Prerequisites
-Node.js 20+
+**orders Table**  
+Stores primary order information.  
 
-Docker Desktop
+**Column** | **Type** | **Description**  
+id | UUID | Unique identifier  
+status | TEXT | Current order status  
+token_in | TEXT | Input token (e.g., SOL)  
+token_out | TEXT | Output token (e.g., USDC)  
+amount | NUMERIC | Swap amount  
+slippage_bps | INTEGER | Max slippage tolerance  
+failure_reason | TEXT | Reason for failure  
+created_at | TIMESTAMP | Creation time  
+updated_at | TIMESTAMP | Last update time  
 
-Postgres & Redis containers
+**order_status_history Table**  
+Stores logs for every order state change.  
 
-Steps
+**Column** | **Type** | **Description**  
+id | SERIAL | Log ID  
+order_id | UUID | Reference to order  
+status | TEXT | Status at this log  
+payload | JSONB | Metadata for event  
+created_at | TIMESTAMP | When logged  
 
+---
 
-git clone https://github.com/mrid07/OrderExecutionEngine_EternaLabsAssignment.git
-cd order-execution-engine
-docker compose up -d
-npm install
-npm run dev
-Expected output:
+## 🧰 Local Setup
 
+**Prerequisites**  
+- Node.js 20+  
+- Docker Desktop  
+- Postgres & Redis containers  
 
+**Steps**  
+1. Clone the repository  
+   git clone https://github.com/mrid07/OrderExecutionEngine_EternaLabsAssignment.git  
+   cd order-execution-engine  
 
-[PG] Connected as oee@127.0.0.1:5433/oee
-[MIGRATE] Done
-[WORKER] Started
-Server listening on http://localhost:3000```
-##🌐 Testing the API
-Create an order:
+2. Start services  
+   docker compose up -d  
 
+3. Install dependencies  
+   npm install  
 
+4. Run the server  
+   npm run dev  
+
+**Expected Output**  
+[PG] Connected as oee@127.0.0.1:5433/oee  
+[MIGRATE] Done  
+[WORKER] Started  
+Server listening on http://localhost:3000  
+
+---
+
+## 🌐 Testing the API
+
+**Create an order**
 
 curl -X POST http://localhost:3000/api/orders/execute \
 -H "Content-Type: application/json" \
--d '{"type":"market","tokenIn":"SOL","tokenOut":"USDC","amount":1,"slippageBps":100}'
-WebSocket updates:
+-d '{"type":"market","tokenIn":"SOL","tokenOut":"USDC","amount":1,"slippageBps":100}'  
 
+**WebSocket updates**
 
-
-ws://localhost:3000/api/orders/execute?orderId=<orderId>
-##🧪 Testing
-arduino
-
-npm test          # run all tests
-npm run test:unit # run unit tests
-npm run test:int  # run integration tests
-
-Example Docker commands:
-
-docker build -t order-execution-engine .
-docker run -p 3000:3000 order-execution-engine
-## Summary of Key Design Choices
-Decision	Reason
-Fastify + TypeScript	Lightweight, fast, and strongly typed
-BullMQ Queue	Async, scalable, and production-grade
-Redis	Reliable, low-latency in-memory broker
-WebSocket	Real-time order tracking
-PostgreSQL	Strong consistency and JSONB flexibility
-Docker	Simplified deployment
-Vitest + Supertest	Reliable automated testing
-
-## Author
-Mridul (mrid07)
-Eterna Labs Assignment Project
-GitHub: mrid07
+ws://localhost:3000/api/orders/execute?orderId=<orderId>  
 
 ---
+
+## 🧪 Testing
+
+npm test          **run all tests**  
+npm run test:unit **run unit tests**  
+npm run test:int  **run integration tests**  
+
+---
+
+## 🐳 Example Docker Commands
+
+docker build -t order-execution-engine .  
+docker run -p 3000:3000 order-execution-engine  
+
+---
+
+## 🧠 Summary of Key Design Choices
+
+**Decision** | **Reason**  
+Fastify + TypeScript | Lightweight, fast, and strongly typed  
+BullMQ Queue | Async, scalable, and production-grade  
+Redis | Reliable, low-latency in-memory broker  
+WebSocket | Real-time order tracking  
+PostgreSQL | Strong consistency and JSONB flexibility  
+Docker | Simplified deployment  
+Vitest + Supertest | Reliable automated testing  
+
+---
+
+## 👤 Author
+
+**Mridul (mrid07)**  
+Eterna Labs Assignment Project  
+GitHub: [mrid07](https://github.com/mrid07)
