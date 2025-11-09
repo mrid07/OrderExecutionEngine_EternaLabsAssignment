@@ -1,214 +1,191 @@
-# Order Execution Engine – Mock DEX Router with Queue, WebSocket, and DB
+# 🧠 Order Execution Engine – Mock DEX Router with Queue, WebSocket, and Database
 
-This project simulates a backend system that processes cryptocurrency swap orders by routing them through different "DEXs" (Decentralized Exchanges). It demonstrates how real-world systems handle **order execution**, **queueing**, **routing**, and **real-time updates**. It also includes a simple front-end testing page built with HTML to interact with the API.
+This project simulates a backend **order execution system** similar to those used in decentralized exchanges (DEXs).  
+It demonstrates how real-world trading systems handle **asynchronous order processing**, **queueing**, **routing logic**, and **real-time status streaming**.
 
----
-
-## ✨ Features
-
-- Submit new orders through a REST API  
-- Route each order to the best DEX based on mock prices and fees  
-- Process orders in a Redis-backed queue using BullMQ  
-- Stream status updates in real time using WebSocket  
-- Store order records and history in a PostgreSQL database  
-- Test coverage for both unit and integration scenarios  
-- Deployable with Docker to platforms like Railway or Render  
+The system routes swap orders across mock DEXs (Raydium and Meteora), processes them using a Redis-backed queue, broadcasts updates over WebSocket, and persists data in PostgreSQL.
 
 ---
 
-## 🧠 How it Works
+## 📖 Overview
 
-1. A user sends an order via the API.  
-2. The order is added to a queue (not processed directly).  
-3. A worker picks up the order and routes it through mock DEXs (Raydium and Meteora).  
-4. Each DEX simulates a quote with randomized price and fees.  
-5. The best DEX is selected, and a simulated swap is executed.  
-6. Each processing step is broadcast to the frontend via WebSocket.  
-7. All updates and order records are stored in PostgreSQL.  
+When a user submits a swap order, it is **queued instead of being processed immediately**.  
+This approach allows the backend to handle high loads efficiently by decoupling API request handling from the actual execution logic.
+
+The engine simulates price quotes from two DEXs and routes each order to the best one based on simulated price and fees.  
+Throughout the process, order updates are streamed to clients in real time via WebSocket, and all order data is stored in a database for auditing and analytics.
 
 ---
 
-## 🛠️ Tech Stack
+## ⚙️ Design Decisions
 
-| Component | Technology Used |
-|------------|-----------------|
-| Backend Framework | Fastify + TypeScript |
-| Queue System | BullMQ (Redis) |
-| Database | PostgreSQL |
-| Real-time Updates | WebSocket |
-| Deployment Ready | Dockerfile included |
-| Testing | Vitest + Supertest |
+### 1. **Fastify + TypeScript (Backend Framework)**
+- **Decision:** Use **Fastify** instead of Express for better performance and native TypeScript support.  
+- **Reasoning:** Fastify provides out-of-the-box schema validation, async-friendly APIs, and a low-overhead HTTP server—ideal for high-throughput systems like trading engines.
 
 ---
 
-## 🚀 Run Locally
-
-### ✅ Requirements
-
-- Node.js (version 20 or higher)  
-- Docker Desktop  
-- Redis and PostgreSQL running in containers  
+### 2. **Queue System: BullMQ + Redis**
+- **Decision:** Introduce a **Redis-backed job queue** using **BullMQ**.  
+- **Reasoning:**  
+  - Decouples order submission (API layer) from execution (worker layer).  
+  - Prevents blocking I/O operations on API requests.  
+  - Enables horizontal scaling by adding more worker processes.  
+  - Reflects real-world DEX backends, which often rely on message queues or job brokers.
 
 ---
 
-### 📂 Step 1: Clone the Repository
+### 3. **Mock DEX Routing Logic**
+- **Decision:** Implement two mock DEX services — *Raydium* and *Meteora* — that generate random quotes (price and fee).  
+- **Reasoning:**  
+  - Simulates real exchange routing logic.  
+  - Allows experimentation with pricing strategies, slippage, and latency without external dependencies.  
+  - Provides a testable environment for order routing algorithms.
+
+---
+
+### 4. **WebSocket for Real-Time Status**
+- **Decision:** Use WebSocket for streaming order status updates.  
+- **Reasoning:**  
+  - Provides instant feedback to users on order lifecycle events (pending → routing → submitted → confirmed).  
+  - Mimics modern trading APIs that use WebSocket or Webhook subscriptions.  
+  - Eliminates the need for clients to poll the API repeatedly.
+
+---
+
+### 5. **PostgreSQL for Persistence**
+- **Decision:** Use PostgreSQL to store order data and history.  
+- **Reasoning:**  
+  - Offers relational integrity and JSONB support for flexible data storage.  
+  - Transaction safety ensures order history and states are always consistent.  
+  - Ideal for analytics and replaying historical executions.
+
+---
+
+### 6. **Dockerized Environment**
+- **Decision:** Package the entire system using Docker.  
+- **Reasoning:**  
+  - Guarantees environment consistency across local and deployed environments.  
+  - Simplifies setup for Postgres and Redis using Docker Compose.  
+  - Makes the system easily deployable to platforms like Railway, Render, or Fly.io.
+
+---
+
+### 7. **Testing Strategy**
+- **Decision:** Use **Vitest** for unit testing and **Supertest** for integration testing.  
+- **Reasoning:**  
+  - Vitest offers fast TypeScript-compatible testing with built-in mocks.  
+  - Supertest allows API-level testing without manual HTTP calls.  
+  - Promotes maintainable, regression-free code through automated tests.
+
+---
+
+## 🏗️ Architecture Overview
+
+```mermaid
+flowchart LR
+    A[Client / Frontend] -->|Submit Order| B[Fastify API]
+    B -->|Enqueue Order| C[Redis Queue (BullMQ)]
+    C -->|Process Job| D[Worker]
+    D -->|Select Best DEX| E[Mock DEXs: Raydium / Meteora]
+    D -->|Update| F[(PostgreSQL DB)]
+    D -->|Broadcast Status| G[WebSocket Server]
+    G -->|Real-Time Updates| A
+
+##🧩 Components
+Component	Responsibility
+API Layer	Receives order requests and enqueues them
+Queue (BullMQ)	Holds pending orders for workers
+Worker	Executes routing and simulates swap
+WebSocket Server	Sends live status updates to clients
+PostgreSQL	Stores orders and status history
+
+##🧪 Data Model
+```orders Table
+Stores primary order information.
+
+Column	Type	Description
+id	UUID	Unique identifier
+status	TEXT	Current order status
+token_in	TEXT	Input token (e.g., SOL)
+token_out	TEXT	Output token (e.g., USDC)
+amount	NUMERIC	Swap amount
+slippage_bps	INTEGER	Max slippage tolerance
+failure_reason	TEXT	Reason for failure
+created_at	TIMESTAMP	Creation time
+updated_at	TIMESTAMP	Last update time
+
+order_status_history Table
+Stores logs for every order state change.
+
+Column	Type	Description
+id	SERIAL	Log ID
+order_id	UUID	Reference to order
+status	TEXT	Status at this log
+payload	JSONB	Metadata for event
+created_at	TIMESTAMP	When logged```
+
+## Local Setup
+```Prerequisites
+Node.js 20+
+
+Docker Desktop
+
+Postgres & Redis containers
+
+Steps
+
 
 git clone https://github.com/mrid07/OrderExecutionEngine_EternaLabsAssignment.git
 cd order-execution-engine
-
-yaml
-
-
----
-
-### 🐳 Step 2: Start Postgres and Redis
-
 docker compose up -d
-
-yaml
-
-
-This will start the following services:
-
-- PostgreSQL on **localhost:5433**  
-- Redis on **localhost:6379**
-
----
-
-### 📝 Step 3: Add Environment Variables
-
-Create a `.env` file in the root directory:
-
-PORT=3000
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-
-PGHOST=127.0.0.1
-PGPORT=5433
-PGDATABASE=oee
-PGUSER=oee
-PGPASSWORD=oee12345
-
-QUEUE_NAME=orders
-CONCURRENCY=5
-
-yaml
-
-
----
-
-### 📦 Step 4: Install Dependencies
-
 npm install
-
-yaml
-
-
----
-
-### ▶️ Step 5: Run the Server
-
 npm run dev
+Expected output:
 
-css
 
-
-You should see output similar to:
 
 [PG] Connected as oee@127.0.0.1:5433/oee
-[MIGRATE] Applying migrations...
 [MIGRATE] Done
 [WORKER] Started
-Server listening on http://localhost:3000
-
-yaml
-
-
----
-
-## 🧪 Test the API
-
-### 🌐 Option 1: Using the Included Frontend
-
-Open the **order-tester.html** file in your browser to:
-
-- Submit new orders  
-- Monitor real-time updates via WebSocket  
-- Fetch stored order history  
-
----
-
-### 🧾 Option 2: Using cURL
-
+Server listening on http://localhost:3000```
+##🌐 Testing the API
 Create an order:
 
-curl -X POST http://localhost:3000/api/orders/execute
--H "Content-Type: application/json"
+
+
+curl -X POST http://localhost:3000/api/orders/execute \
+-H "Content-Type: application/json" \
 -d '{"type":"market","tokenIn":"SOL","tokenOut":"USDC","amount":1,"slippageBps":100}'
-
-makefile
-
-
-Response:
-
-{"orderId":"abc123"}
-
-sql
+WebSocket updates:
 
 
-View real-time updates using WebSocket:
 
-ws://localhost:3000/api/orders/execute?orderId=abc123
+ws://localhost:3000/api/orders/execute?orderId=<orderId>
+##🧪 Testing
+arduino
 
-yaml
+npm test          # run all tests
+npm run test:unit # run unit tests
+npm run test:int  # run integration tests
 
+Example Docker commands:
 
----
+docker build -t order-execution-engine .
+docker run -p 3000:3000 order-execution-engine
+## Summary of Key Design Choices
+Decision	Reason
+Fastify + TypeScript	Lightweight, fast, and strongly typed
+BullMQ Queue	Async, scalable, and production-grade
+Redis	Reliable, low-latency in-memory broker
+WebSocket	Real-time order tracking
+PostgreSQL	Strong consistency and JSONB flexibility
+Docker	Simplified deployment
+Vitest + Supertest	Reliable automated testing
 
-## 📊 Database Schema
-
-### `orders` Table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Unique order ID |
-| status | TEXT | Current order status (pending, confirmed, etc.) |
-| token_in | TEXT | Input token (e.g. SOL) |
-| token_out | TEXT | Output token (e.g. USDC) |
-| amount | NUMERIC | Amount to swap |
-| slippage_bps | INTEGER | Max allowed slippage (in basis points) |
-| failure_reason | TEXT | Reason for failure (if any) |
-| created_at | TIMESTAMP | Time when the order was created |
-| updated_at | TIMESTAMP | Time when the order was last updated |
+## Author
+Mridul (mrid07)
+Eterna Labs Assignment Project
+GitHub: mrid07
 
 ---
-
-### `order_status_history` Table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | SERIAL | Auto-incremented ID |
-| order_id | UUID | Reference to the orders table |
-| status | TEXT | Status at this log entry |
-| payload | JSONB | Additional metadata and details |
-| created_at | TIMESTAMP | Timestamp when the status was logged |
-
----
-
-## ✅ Tests
-
-Run all tests:
-
-npm test
-
-sql
-
-
-Run only unit tests:
-
-npm run test:unit
-
-pgsql
-
-
-Run integration tests (make sure the server is running):
