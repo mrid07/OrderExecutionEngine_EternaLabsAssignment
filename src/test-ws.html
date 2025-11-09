@@ -12,30 +12,42 @@
     <pre id="log" style="border:1px solid #ddd;padding:10px;max-height:300px;overflow:auto"></pre>
     <script>
       const log = (m)=>{ const el=document.getElementById('log'); el.textContent += m + "\n"; el.scrollTop=el.scrollHeight; };
+
       document.getElementById('form').onsubmit = async (e) => {
         e.preventDefault();
-        const fd = new FormData(e.target);
-        const body = {
-          type: "market",
-          tokenIn: fd.get("tokenIn"),
-          tokenOut: fd.get("tokenOut"),
-          amount: Number(fd.get("amount")),
-          slippageBps: Number(fd.get("slippageBps"))
-        };
-        log("POST /api/orders/execute ...");
-        const res = await fetch("http://localhost:3000/api/orders/execute", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(body)
-        });
-        const { orderId } = await res.json();
-        log("orderId: " + orderId);
-        const ws = new WebSocket(`ws://localhost:3000/api/orders/execute?orderId=${encodeURIComponent(orderId)}`);
-        ws.onopen = () => log("[ws] open");
-        ws.onmessage = (ev) => log("[ws] " + ev.data);
-        ws.onclose = () => log("[ws] closed");
-        ws.onerror = (err) => log("[ws] error");
+        try {
+          const fd = new FormData(e.target);
+          const body = {
+            type: "market",
+            tokenIn: fd.get("tokenIn"),
+            tokenOut: fd.get("tokenOut"),
+            amount: Number(fd.get("amount")),
+            slippageBps: Number(fd.get("slippageBps"))
+          };
+          log("POST /api/orders/execute ...");
+          const res = await fetch("http://localhost:3000/api/orders/execute", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(body)
+          });
+          log("HTTP status: " + res.status);
+          const json = await res.json().catch(()=>null);
+          log("HTTP body: " + JSON.stringify(json));
+          if (!res.ok || !json?.orderId) { log("Request failed"); return; }
+
+          const orderId = json.orderId;
+          log("orderId: " + orderId);
+
+          const ws = new WebSocket(`ws://localhost:3000/api/orders/execute?orderId=${encodeURIComponent(orderId)}`);
+          ws.onopen = () => log("[ws] open");
+          ws.onmessage = (ev) => log("[ws] " + ev.data);
+          ws.onclose = () => log("[ws] closed");
+          ws.onerror = (err) => log("[ws] error " + (err?.message || ''));
+        } catch (err) {
+          log("Fetch error: " + (err?.message || err));
+        }
       };
     </script>
+
   </body>
 </html>
