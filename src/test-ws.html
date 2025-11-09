@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <body>
+    <h3>Order Execution WS Tester</h3>
+    <form id="form">
+      <label>tokenIn <input name="tokenIn" value="SOL"></label>
+      <label>tokenOut <input name="tokenOut" value="USDC"></label>
+      <label>amount <input name="amount" type="number" step="0.01" value="1"></label>
+      <label>slippageBps <input name="slippageBps" type="number" value="100"></label>
+      <button type="submit">Create & Subscribe</button>
+    </form>
+    <pre id="log" style="border:1px solid #ddd;padding:10px;max-height:300px;overflow:auto"></pre>
+    <script>
+      const log = (m)=>{ const el=document.getElementById('log'); el.textContent += m + "\n"; el.scrollTop=el.scrollHeight; };
+      document.getElementById('form').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = {
+          type: "market",
+          tokenIn: fd.get("tokenIn"),
+          tokenOut: fd.get("tokenOut"),
+          amount: Number(fd.get("amount")),
+          slippageBps: Number(fd.get("slippageBps"))
+        };
+        log("POST /api/orders/execute ...");
+        const res = await fetch("http://localhost:3000/api/orders/execute", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(body)
+        });
+        const { orderId } = await res.json();
+        log("orderId: " + orderId);
+        const ws = new WebSocket(`ws://localhost:3000/api/orders/execute?orderId=${encodeURIComponent(orderId)}`);
+        ws.onopen = () => log("[ws] open");
+        ws.onmessage = (ev) => log("[ws] " + ev.data);
+        ws.onclose = () => log("[ws] closed");
+        ws.onerror = (err) => log("[ws] error");
+      };
+    </script>
+  </body>
+</html>
