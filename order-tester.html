@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Order API Tester</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 28px; }
+    label { display:block; margin: 8px 0 4px; font-weight: 600; }
+    input, button { padding: 8px 10px; font-size: 14px; }
+    button { cursor: pointer; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .card { border:1px solid #ddd; border-radius:10px; padding:14px; margin:12px 0; background:#fafafa; }
+    pre { background:#111; color:#ddd; padding:10px; border-radius:8px; overflow:auto; max-height:300px; }
+    .ok { color: #2e7d32; }
+    .err { color: #c62828; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    small { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>Order API Tester</h1>
+  <small>API base: <span id="apiBase" class="mono">http://localhost:3000</span></small>
+
+  <div class="card">
+    <h2>Create & Stream (POST + WS)</h2>
+    <div class="row">
+      <label>tokenIn <input id="tokenIn" value="SOL"></label>
+      <label>tokenOut <input id="tokenOut" value="USDC"></label>
+      <label>amount <input id="amount" type="number" step="0.01" value="1"></label>
+      <label>slippageBps <input id="slippage" type="number" value="100"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnCreate">Create order & Subscribe WS</button>
+      <button id="btnCloseWS" disabled>Close WS</button>
+      <span>orderId: <span id="orderId" class="mono"></span></span>
+      <button id="btnCopy" style="display:none">Copy</button>
+    </div>
+    <pre id="log"></pre>
+  </div>
+
+  <div class="card">
+    <h2>Fetch Order (GET /api/orders/:id)</h2>
+    <div class="row">
+      <input id="fetchId" placeholder="Paste orderId here" style="min-width:380px" />
+      <button id="btnFetch">Fetch</button>
+    </div>
+    <pre id="fetchOut"></pre>
+  </div>
+
+  <script>
+    const API = document.getElementById('apiBase').textContent.trim();
+    const $ = (id) => document.getElementById(id);
+    const log = (m) => { const el=$('log'); el.textContent += m + "\n"; el.scrollTop = el.scrollHeight; };
+    const fmt = (o) => JSON.stringify(o, null, 2);
+
+    let ws = null;
+
+    $('btnCreate').onclick = async () => {
+      const body = {
+        type: 'market',
+        tokenIn: $('tokenIn').value,
+        tokenOut: $('tokenOut').value,
+        amount: Number($('amount').value),
+        slippageBps: Number($('slippage').value),
+      };
+
+      log('POST /api/orders/execute …');
+      try {
+        const res = await fetch(`${API}/api/orders/execute`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        log(`HTTP ${res.status} ${fmt(json)}`);
+        if (!res.ok || !json?.orderId) return;
+
+        const id = json.orderId;
+        $('orderId').textContent = id;
+        $('fetchId').value = id;
+        $('btnCopy').style.display = 'inline-block';
+        $('btnCloseWS').disabled = false;
+
+        ws?.close?.();
+        const url = `ws://localhost:3000/api/orders/execute?orderId=${encodeURIComponent(id)}`;
+        log(`[ws] connecting → ${url}`);
+        ws = new WebSocket(url);
+
+        ws.onopen = () => log('[ws] open');
+        ws.onmessage = (ev) => log('[ws] ' + ev.data);
+        ws.onclose = () => { log('[ws] closed'); $('btnCloseWS').disabled = true; };
+        ws.onerror = (e) => log('[ws] error');
+      } catch (e) {
+        log('[err] ' + (e?.message || e));
+      }
+    };
+
+    $('btnCloseWS').onclick = () => {
+      try { ws?.close?.(); } catch {}
+    };
+
+    $('btnCopy').onclick = async () => {
+      const id = $('orderId').textContent.trim();
+      if (!id) return;
+      await navigator.clipboard.writeText(id);
+      log(`[copied] ${id}`);
+    };
+
+    $('btnFetch').onclick = async () => {
+      const id = $('fetchId').value.trim();
+      $('fetchOut').textContent = '';
+      if (!id) { $('fetchOut').textContent = 'Please enter an orderId'; return; }
+      try {
+        const res = await fetch(`${API}/api/orders/${encodeURIComponent(id)}`);
+        const text = await res.text();
+        $('fetchOut').textContent = `HTTP ${res.status}\n` + text;
+      } catch (e) {
+        $('fetchOut').textContent = '[err] ' + (e?.message || e);
+      }
+    };
+  </script>
+</body>
+</html>

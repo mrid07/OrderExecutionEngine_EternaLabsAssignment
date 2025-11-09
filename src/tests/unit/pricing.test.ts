@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { effectivePrice, quotedOut, minOutWithSlippage, executedOut } from '../utils/pricing.js';
+import { effectivePrice, quotedOut, minOutWithSlippage, executedOut } from '../../utils/pricing.js';
+// src/tests/unit/pricing.test.ts
 
 describe('pricing utils', () => {
   it('computes effective price after fee', () => {

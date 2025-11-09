@@ -23,6 +23,17 @@ export async function registerOrderRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: 'internal_error' });
     }
   });
+app.get('/api/orders/:id', async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const { pool } = await import('../db/db.js');
+  const o = await pool.query('select * from orders where id=$1', [id]);
+  if (o.rowCount === 0) return reply.code(404).send({ error: 'not_found' });
+  const h = await pool.query(
+    'select status, payload, created_at from order_status_history where order_id=$1 order by id asc',
+    [id]
+  );
+  return { order: o.rows[0], history: h.rows };
+});
 
   // WS: same path (GET) → stream statuses
   app.get('/api/orders/execute', { websocket: true }, (connection, req) => {
